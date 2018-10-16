@@ -5,7 +5,7 @@ import math
 import time
 
 title = '광물캐기'
-version = '0.4_alpha'
+version = 'Generation I'
 
 pygame.init()
 
