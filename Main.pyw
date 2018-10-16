@@ -2,6 +2,7 @@ import pygame
 # import socket
 import random
 import math
+import time
 
 title = '광물캐기'
 version = '0.4_alpha'
@@ -24,13 +25,14 @@ class game:
         height = 720
 
         fps = 144
+        display_fps = fps
 
         pygame.display.set_caption(f'{title} {version}')
     window = pygame.display.set_mode((display.width, display.height))
 
     exit = False
 
-    clock = pygame.time.Clock()
+    # clock = pygame.time.Clock()
 
     state = None
 
@@ -96,7 +98,7 @@ class Particle(GameObject):
         self.vel_x = random.random() * 10 - 5
         self.vel_y = random.random() * 10 - 6
 
-        self.gravity = 30 / game.display.fps
+        self.gravity = 30 / game.display.display_fps
 
     def tick(self):
         self.x += self.vel_x
@@ -149,12 +151,12 @@ class Text(GameObject):
 
     def tick(self):
         if self.move_x:
-            self.x += (self.target_x - self.x) / (game.display.fps / 10)
+            self.x += (self.target_x - self.x) / (game.display.display_fps / 10)
             if math.fabs(self.target_x - self.x) - 0.1 < 0:
                 self.move_x = False
 
         if self.move_y:
-            self.y += (self.target_y - self.y) / (game.display.fps / 10)
+            self.y += (self.target_y - self.y) / (game.display.display_fps / 10)
             if math.fabs(self.target_y - self.y) - 0.1 < 0:
                 self.move_y = False
 
@@ -183,7 +185,7 @@ class Cursor(GameObject):
         self.pickaxe = pickaxe
         self.images_count = images_count
 
-        self.surface = pygame.image.load(f'./src/image/pickaxes/{self.pickaxe}.png').convert_alpha()
+        self.surface = pygame.image.load(f'./src/image/pickaxe/{self.pickaxe}.png').convert_alpha()
 
         self.center_x = 0
         self.center_y = 0
@@ -231,23 +233,41 @@ class Rect(GameObject):
 
     def render(self):
         pygame.draw.rect(game.window, self.color, ((self.x, self.y), (self.width, self.height)))
-# THE LAST OBJECT HERE
+
+class Stone(GameObject):
+    def __init__(self, kinds, offset):
+        self.kinds = kinds
+        self.offset = offset
+
+        self.surface = pygame.image.load(f'./src/image/stone/{kinds}.png').convert_alpha()
+
+        self.x = center(game.display.width, self.surface.get_width())
+        self.y = center(game.display.height, self.surface.get_height()) - 50
+
+    def render(self):
+        game.window.blit(self.surface, (self.x, self.y))
 
 class HUD(GameObject):
     text_format: TextFormat
 
     objects_count_surface: pygame.Surface
     state_surface: pygame.Surface
+    position_surface: pygame.Surface
+    fps_surface: pygame.Surface
 
     def tick(self):
         self.text_format = TextFormat('./src/font/H2PORM.TTF', 10, color.text)
 
-        self.objects_count_surface = self.text_format.render(str(len(objects)))
-        self.state_surface = self.text_format.render(game.state)
+        self.objects_count_surface = self.text_format.render(str(len(objects)) + 'OBJS')
+        self.state_surface = self.text_format.render(game.state + ' STTE')
+        self.position_surface = self.text_format.render(f'{cursor.position} CRSR')
+        self.fps_surface = self.text_format.render(f'{game.display.display_fps} FRPS')
 
     def render(self):
         game.window.blit(self.objects_count_surface, (game.display.width - self.objects_count_surface.get_width(), game.display.height - self.objects_count_surface.get_height()))
         game.window.blit(self.state_surface, (game.display.width - self.state_surface.get_width(), game.display.height - self.objects_count_surface.get_height() - self.state_surface.get_height()))
+        game.window.blit(self.position_surface, (game.display.width - self.position_surface.get_width(), game.display.height - self.objects_count_surface.get_height() - self.state_surface.get_height() - self.position_surface.get_height()))
+        game.window.blit(self.fps_surface, (game.display.width - self.fps_surface.get_width(), game.display.height - self.objects_count_surface.get_height() - self.state_surface.get_height() - self.position_surface.get_height() - self.fps_surface.get_height()))
 hud = HUD()
 
 def tick():
@@ -279,6 +299,8 @@ def change_state(next_state):
         delete_objects_by_type(Text)
         delete_objects_by_type(ButtonFrame)
 
+        add_object(Stone('blue', 2))  # 테스트 코드
+
         add_object(Rect(0, game.display.height - 100, game.display.width, 100, color.gray))
 
         tmp = Text(0, game.display.height - 74, '상점', white_button_text_format)
@@ -303,7 +325,7 @@ def change_state(next_state):
 
         add_object(Cursor('wooden_pickaxe', 3))
 
-    elif next_state == state.setting:
+    elif next_state == state.store:
         delete_objects_by_type(Text)
         delete_objects_by_type(ButtonFrame)
         delete_objects_by_type(Rect)
@@ -327,37 +349,60 @@ def change_state(next_state):
 
 change_state(state.title)
 
+delta = 0
+delta2 = 0
+delta2_loops = 0
+time_per_loop = 1 / game.display.fps
+now = time.time()
+
 while not game.exit:
-    cursor.ppressed = cursor.pressed
-    cursor.pressed = pygame.mouse.get_pressed()
-    cursor.position = pygame.mouse.get_pos()
-    cursor.rel = pygame.mouse.get_rel()
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            game.exit = True
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LALT:
-                keyboard.lalt = True
-            elif event.key == pygame.K_RALT:
-                keyboard.ralt = True
-            elif event.key == pygame.K_F4:
-                if keyboard.lalt or keyboard.ralt:
-                    game.exit = True
-        elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_LALT:
-                keyboard.lalt = False
-            elif event.key == pygame.K_RALT:
-                keyboard.ralt = False
+    pnow = now
+    now = time.time()
 
-    tick()
-    for obj in objects:
-        obj.tick()
+    delta2 += now - pnow
+    if delta2 >= 1:
+        delta2 -= 1
+        game.display.display_fps = delta2_loops
+        delta2_loops = 0
 
-    game.window.fill(color.background)
-    for obj in objects:
-        obj.render()
-    render()
-    pygame.display.flip()
+    if delta >= 1:
+        delta -= 1
+        delta2_loops += 1
+        cursor.ppressed = cursor.pressed
+        cursor.pressed = pygame.mouse.get_pressed()
+        cursor.position = pygame.mouse.get_pos()
+        cursor.rel = pygame.mouse.get_rel()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                game.exit = True
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LALT:
+                    keyboard.lalt = True
+                elif event.key == pygame.K_RALT:
+                    keyboard.ralt = True
+                elif event.key == pygame.K_F4:
+                    if keyboard.lalt or keyboard.ralt:
+                        game.exit = True
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_LALT:
+                    keyboard.lalt = False
+                elif event.key == pygame.K_RALT:
+                    keyboard.ralt = False
 
-    game.clock.tick(game.display.fps)
+        tick()
+        for obj in objects:
+            obj.tick()
+
+        game.window.fill(color.background)
+        for obj in objects:
+            obj.render()
+        render()
+        pygame.display.flip()
+    else:
+        try:
+            delta += (now - pnow) / time_per_loop
+        except ZeroDivisionError:
+            pass
+
+    # game.clock.tick(game.display.fps)
 pygame.quit()
